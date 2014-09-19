@@ -1,6 +1,9 @@
 from PIL import Image
 import euclid
 from math import floor
+from shapes import RaycastingSphere, RaycastingPlane
+from camera import Camera
+from time import time
 
 
 class RayColor:
@@ -11,83 +14,6 @@ class RayColor:
     def toRGB(self):
         i = self.intensity
         return (int(self.rgb[0]*i), int(self.rgb[1]*i), int(self.rgb[2]*i))
-
-class RaycastingObject(object):
-    def __init__(self):
-        self.color = (255,255,0)
-        self.reflectionIndex = 0.0
-    
-    def getColor(self, coords=None):
-        return self.color
-
-    def intersect(self, ray):
-        raise BaseException("Must overload intersect() in class " + type(self).__name__)
-
-    def distance(self, ray):
-        raise BaseException("Must overload distance() in class " + type(self).__name__)
-        
-    def __eq__(self, other):
-        raise BaseException("Must overload __eq__() in class " + type(self).__name__)
-        
-    def __ne__(self, other):
-        raise BaseException("Must overload __ne__() in class " + type(self).__name__)
-
-class RaycastingSphere(RaycastingObject):
-    def __init__(self, center, radius):
-        super(RaycastingSphere, self).__init__()
-        if type(center) != euclid.Point3:
-            raise TypeError("Must provide Point3 for center")
-        self.c = center
-        self.r = radius
-        self.shape = euclid.Sphere(center, radius)
-
-    def intersect(self, ray):
-        return self.shape.intersect(ray)
-
-    def distance(self, ray):
-        return self.shape.distance(ray)
-        
-    def __eq__(self, other):
-        if type(self) != type(other):
-            return False
-        a = self.c == other.c
-        b = self.r == other.r        
-        c = self.color == other.color
-        return a and b and c
-    
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-class RaycastingPlane(RaycastingObject):
-    def __init__(self, plane):
-        super(RaycastingPlane, self).__init__()
-        if type(plane)!=euclid.Plane:
-            raise TypeError("Requires Plane")
-        self.shape = plane
-        self.color1 = (0,0,0)
-        self.color2 = (200,200,200)
-
-    def intersect(self, ray):
-        return self.shape.intersect(ray)
-
-    def distance(self, ray):
-        return self.shape.distance(ray)
-
-    def getColor(self, coords=None):
-        s = int(coords[0]) + int(coords[1]) + int(coords[2])
-        if s % 2 == 0:
-            return self.color1
-        return self.color2
-
-    def __eq__(self, other):
-        if type(self) != type(other):
-            return False
-        a = self.n == other.n
-        b = self.k == other.k
-        return a and b
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
 
 distances = []
 
@@ -117,9 +43,10 @@ class Scene:
         # for now, directly define screen
         self.topleft = euclid.Point3(20.0, -4.0, -4.0)
         self.bottomright = euclid.Point3(20.0, -12.0, -12.0)
-        self.camera = euclid.Point3(30.0, 0.0, 0.0)
+        #self.camera = euclid.Point3(30.0, 0.0, 0.0)
+        self.camera = Camera(zoom=0.05, rotation=(0, 6, 0))
         # light source is a single point for now
-        self.light = euclid.Point3(-50.0,30.0,5.0)
+        self.light = euclid.Point3(-60.0,0.0,20.0)
 
 
     def getPixelCoords(self, w, h):
@@ -210,14 +137,15 @@ class Scene:
 
 if __name__=="__main__":
     #import rpdb2; rpdb2.start_embedded_debugger('1234')
-    w = 360
+    start = time()
+    w = 180
     scene = Scene()
-    scene.objects.append(RaycastingSphere(euclid.Point3(0,0,0), 5.0))
+    scene.objects.append(RaycastingSphere(euclid.Point3(-50, 0, 0), 2.0))
     #scene.objects.append(RaycastingPlane(euclid.Plane(euclid.Point3(1,1,1), euclid.Vector3(0.0,1.0,1.0))))
     im = Image.new("RGB", (w, w), (0,0,255))
     pixels = im.load()
-    for x, y, point in scene.getPixelCoords(w, w):
-        color = scene.trace(euclid.Ray3(point, point-scene.camera), 1.0, 1)
+    for x, y, point in scene.camera.getPixelCoords(w, w):
+        color = scene.trace(euclid.Ray3(point, point-scene.camera.focus), 1.0, 1)
         if color.__class__.__name__ == "RayColor":
             pixels[x,y] = color.toRGB()
         elif type(color)==tuple:
@@ -229,4 +157,7 @@ if __name__=="__main__":
         print "min:" + str(reduce(lambda x,y: x if x < y else y, distances))
         distances.insert(0, 0.0)
         print "number of 0.0s:" + str(reduce(lambda x,y: x+1 if y == 0.0 else x, distances))
-    im.save("/home/skyrunner/upload/imgs/test.png")
+    #im.save("/home/skyrunner/upload/imgs/test.png")
+    im.save("out/test.png")
+    end = time()
+    print "Took %.2f seconds." % (end - start)
