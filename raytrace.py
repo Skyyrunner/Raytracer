@@ -21,7 +21,7 @@ def reflect(point, obj, ray):
     if type(obj) == RaycastingSphere:
         n = (point - obj.c).normalized()
         v = ray.v.normalized()
-        return 2 * n.dot(v) * n - v
+        return euclid.Ray3(point, 2 * n.dot(v) * n - v)
     else:
         raise TypeError("Unknown shape")
 
@@ -37,25 +37,13 @@ def blend(colors):
     return RayColor(intensity, rgb) 
 
 class Scene:
-    def __init__(self):
+    def __init__(self, cwidth = 180, cheight = 180):
         self.BackgroundColor = (255, 0, 255)
         self.objects = []
-        # for now, directly define screen
-        self.topleft = euclid.Point3(20.0, -4.0, -4.0)
-        self.bottomright = euclid.Point3(20.0, -12.0, -12.0)
-        #self.camera = euclid.Point3(30.0, 0.0, 0.0)
-        self.camera = Camera(zoom=0.05, rotation=(0, 6, 0))
+        self.camera = Camera(zoom=0.15, rotation=(0, 16, -4), width=cwidth, height=cheight)
         # light source is a single point for now
-        self.light = euclid.Point3(-60.0,0.0,20.0)
+        self.light = euclid.Point3(-120.0, 60.0, 0.0)
 
-
-    def getPixelCoords(self, w, h):
-        # must assume that x is fixed and y,z are what is being iterated over.
-        deltaW = (self.topleft.y - self.bottomright.y)/float(w)
-        deltaH = (self.topleft.z - self.bottomright.z)/float(h)
-        for x in xrange(w):
-            for y in xrange(h):
-                yield x, y, euclid.Point3(self.topleft.x, self.topleft.y + deltaW * x, self.topleft.z + deltaH * y)
 
     def getColor(self, intersect, obj, intensity):
         # DEBUG: no shadows
@@ -71,11 +59,12 @@ class Scene:
                     continue
                 elif i == None:
                     continue # no intercept
+                # otherwise find penetration
                 lenI = abs(i)
                 distances.append(lenI)
                 if lenI < 0.1:
                     continue
-            if type(i) != None:
+            if i != None:
                 # is in shadow
                 return RayColor(intensity, (0,0,0))
         # otherwise not in shadow
@@ -85,7 +74,6 @@ class Scene:
         elif type(obj) == RaycastingSphere:
             normal = (intersect - obj.shape.c).normalize()
         strength = abs(vectorToLight.normalized().dot(normal))
-        #strength = 1.0
         return RayColor(intensity*strength, obj.getColor(intersect))
 
     def findIntersect(self, ray):
@@ -94,14 +82,14 @@ class Scene:
         obj = None
         for o in self.objects:
             inter = o.intersect(ray)
-            if type(inter)!= None:
+            if inter != None:
                 # intersects
                 if type(inter) == euclid.LineSegment3:
-                    d = abs(ray.p - o.c)
+                    d = abs(ray.p - o.c) - o.r
                     if d > maxD:
                         maxD = d
                         obj = o
-                        # if inter is a line segment. We require the closer point.
+                        # if inter is a line segment, we require the closer point.
                         L1 = abs(ray.p - inter.p1)
                         L2 = abs(ray.p - inter.p2)
                         if L1 > L2:
@@ -114,6 +102,8 @@ class Scene:
                         maxD = d
                         obj = o
                         intersect = inter
+                else:
+                    raise TypeError("Unknown type " + str(type(inter)))
                         
         if obj == None:
             return None,None
@@ -138,13 +128,17 @@ class Scene:
 if __name__=="__main__":
     #import rpdb2; rpdb2.start_embedded_debugger('1234')
     start = time()
-    w = 180
-    scene = Scene()
+    screenw = 256
+    screenh = 256
+    imgW = 256
+    imgH = 256
+    scene = Scene(screenw, screenh)
     scene.objects.append(RaycastingSphere(euclid.Point3(-50, 0, 0), 2.0))
+    scene.objects.append(RaycastingSphere(euclid.Point3(-55, 2, 0), 1.0))
     #scene.objects.append(RaycastingPlane(euclid.Plane(euclid.Point3(1,1,1), euclid.Vector3(0.0,1.0,1.0))))
-    im = Image.new("RGB", (w, w), (0,0,255))
+    im = Image.new("RGB", (imgW, imgH), (0,0,255))
     pixels = im.load()
-    for x, y, point in scene.camera.getPixelCoords(w, w):
+    for x, y, point in scene.camera.getPixelCoords(imgW, imgH):
         color = scene.trace(euclid.Ray3(point, point-scene.camera.focus), 1.0, 1)
         if color.__class__.__name__ == "RayColor":
             pixels[x,y] = color.toRGB()
@@ -161,3 +155,4 @@ if __name__=="__main__":
     im.save("out/test.png")
     end = time()
     print "Took %.2f seconds." % (end - start)
+    im.show()
