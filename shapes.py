@@ -50,7 +50,7 @@ class RaycastingSphere(RaycastingObject):
 class RaycastingPlane(RaycastingObject):
     def __init__(self, plane):
         super(RaycastingPlane, self).__init__()
-        if type(plane)!=euclid.Plane:
+        if type(plane) != euclid.Plane:
             raise TypeError("Requires Plane")
         self.shape = plane
         self.color1 = (0,0,0)

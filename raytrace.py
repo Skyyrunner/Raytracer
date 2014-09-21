@@ -63,7 +63,7 @@ class Scene:
                 # otherwise find penetration
                 lenI = abs(i)
                 distances.append(lenI)
-                if lenI < 0.1:
+                if lenI < 0.2:
                     continue
             if i != None:
                 # is in shadow
@@ -77,13 +77,23 @@ class Scene:
         strength = abs(vectorToLight.normalized().dot(normal))
         return RayColor(intensity*strength, obj.getColor(intersect))
 
-    def findIntersect(self, ray):
+    def findIntersect(self, ray, previousObject = None):
         maxD = 0
         intersect = None
         obj = None
         for o in self.objects:
             inter = o.intersect(ray)
-            if inter != None:
+            if o == previousObject:
+                if type(inter) == euclid.Point3:
+                    # intersection with self
+                    continue
+                elif inter == None:
+                    continue
+                # find length of intercept
+                lenI = abs(inter)
+                if lenI < 0.2:
+                    continue
+            if type(inter) != type(None):
                 # intersects
                 if type(inter) == euclid.LineSegment3:
                     d = abs(ray.p - o.c) - o.r
@@ -111,18 +121,20 @@ class Scene:
         else:
             return intersect, obj
 
-    def trace(self, ray, intensity, depth = 0):
+    def trace(self, ray, intensity, depth = 0, previousObject = None):
         depth -= 1
         if depth < 0:
             return RayColor(intensity, self.BackgroundColor)
-        point, obj = self.findIntersect(ray)
+        point, obj = self.findIntersect(ray, previousObject)
         if obj == None: # no intersections
+            if previousObject != None: # try to get the 'original' color of the object
+                return self.getColor(ray.p, previousObject, intensity)
             return RayColor(intensity, self.BackgroundColor)
         if obj.reflectionIndex == 0.0:
             return self.getColor(point, obj, intensity)
         # otherwise shoot off reflected rays
         col1 = self.getColor(point, obj, (1 - obj.reflectionIndex)*intensity)
-        col2 = self.trace(reflect(point, obj, ray), intensity * obj.reflectionIndex, depth)
+        col2 = self.trace(reflect(point, obj, ray), intensity * obj.reflectionIndex, depth, obj)
         return blend(col1, col2)
 
 
@@ -139,12 +151,15 @@ if __name__=="__main__":
     scene.objects.append(RaycastingSphere(euclid.Point3(-55, 2, 0), 1.0))
     scene.objects[-1].reflectionIndex = 0.2
     scene.objects.append(RaycastingSphere(euclid.Point3(-55, 8, -2), 3.0))
-    scene.objects[-1].reflectionIndex = 0.0
-    #scene.objects.append(RaycastingPlane(euclid.Plane(euclid.Point3(1,1,1), euclid.Vector3(0.0,1.0,1.0))))
+    scene.objects[-1].reflectionIndex = 0.1
+    scene.objects.append(RaycastingSphere(euclid.Point3(-55, 2, -5), 2.0))
+    scene.objects[-1].color = (255,0,0)
+    scene.objects.append(RaycastingPlane(euclid.Plane(euclid.Point3(1,1,1), 
+        euclid.Vector3(0.0,1.0,1.0))))
     im = Image.new("RGB", (imgW, imgH), (0,0,255))
     pixels = im.load()
     for x, y, point in scene.camera.getPixelCoords(imgW, imgH):
-        color = scene.trace(euclid.Ray3(point, point-scene.camera.focus), 1.0, 3)
+        color = scene.trace(euclid.Ray3(point, point-scene.camera.focus), 1.0, 5)
         if color.__class__.__name__ == "RayColor":
             pixels[x,y] = color.toRGB()
         elif type(color)==tuple:
