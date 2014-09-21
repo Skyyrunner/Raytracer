@@ -26,12 +26,13 @@ def reflect(point, obj, ray):
         raise TypeError("Unknown shape")
 
 # Supply 2 RayColors, returns RGB tuple that must be floor()'d before used in PIL
-def blend(colors):
+def blend(*colors):
     intensity = 0.0
+    colors = list(colors)
     for c in colors:
         intensity += c.intensity
     colors.insert(0, 0.0)
-    rgb = [0,0,0]
+    rgb = [0.0,0.0,0.0]
     for x in xrange(3):
         rgb[x] = reduce(lambda s, c: s + c.rgb[x] * c.intensity, colors)   
     return RayColor(intensity, rgb) 
@@ -134,12 +135,16 @@ if __name__=="__main__":
     imgH = 256
     scene = Scene(screenw, screenh)
     scene.objects.append(RaycastingSphere(euclid.Point3(-50, 0, 0), 2.0))
+    scene.objects[-1].reflectionIndex = 0.2
     scene.objects.append(RaycastingSphere(euclid.Point3(-55, 2, 0), 1.0))
+    scene.objects[-1].reflectionIndex = 0.2
+    scene.objects.append(RaycastingSphere(euclid.Point3(-55, 8, -2), 3.0))
+    scene.objects[-1].reflectionIndex = 0.0
     #scene.objects.append(RaycastingPlane(euclid.Plane(euclid.Point3(1,1,1), euclid.Vector3(0.0,1.0,1.0))))
     im = Image.new("RGB", (imgW, imgH), (0,0,255))
     pixels = im.load()
     for x, y, point in scene.camera.getPixelCoords(imgW, imgH):
-        color = scene.trace(euclid.Ray3(point, point-scene.camera.focus), 1.0, 1)
+        color = scene.trace(euclid.Ray3(point, point-scene.camera.focus), 1.0, 3)
         if color.__class__.__name__ == "RayColor":
             pixels[x,y] = color.toRGB()
         elif type(color)==tuple:
