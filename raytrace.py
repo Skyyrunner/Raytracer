@@ -21,9 +21,12 @@ def reflect(point, obj, ray):
     if type(obj) == RaycastingSphere:
         n = (point - obj.c).normalized()
         v = ray.v.normalized()
-        return euclid.Ray3(point, 2 * n.dot(v) * n - v)
+    elif type(obj) == RaycastingPlane:
+        n = obj.shape.n
+        v = ray.v.normalized()
     else:
         raise TypeError("Unknown shape")
+    return euclid.Ray3(point, 2 * n.dot(v) * n - v)
 
 # Supply 2 RayColors, returns RGB tuple that must be floor()'d before used in PIL
 def blend(*colors):
@@ -43,7 +46,7 @@ class Scene:
         self.objects = []
         self.camera = Camera(zoom=0.15, rotation=(0, 16, -4), width=cwidth, height=cheight)
         # light source is a single point for now
-        self.light = euclid.Point3(-120.0, 60.0, 0.0)
+        self.light = euclid.Point3(-80.0, 30.0, -20.0)
 
 
     def getColor(self, intersect, obj, intensity):
@@ -93,7 +96,7 @@ class Scene:
                 lenI = abs(inter)
                 if lenI < 0.2:
                     continue
-            if type(inter) != type(None):
+            if inter != None:
                 # intersects
                 if type(inter) == euclid.LineSegment3:
                     d = abs(ray.p - o.c) - o.r
@@ -154,12 +157,13 @@ if __name__=="__main__":
     scene.objects[-1].reflectionIndex = 0.1
     scene.objects.append(RaycastingSphere(euclid.Point3(-55, 2, -5), 2.0))
     scene.objects[-1].color = (255,0,0)
-    scene.objects.append(RaycastingPlane(euclid.Plane(euclid.Point3(1,1,1), 
-        euclid.Vector3(0.0,1.0,1.0))))
+    scene.objects.append(RaycastingPlane((0,90,20), 
+        euclid.Point3(-50, 0, 0)))
+    scene.objects[-1].reflectionIndex = 0.2
     im = Image.new("RGB", (imgW, imgH), (0,0,255))
     pixels = im.load()
     for x, y, point in scene.camera.getPixelCoords(imgW, imgH):
-        color = scene.trace(euclid.Ray3(point, point-scene.camera.focus), 1.0, 5)
+        color = scene.trace(euclid.Ray3(scene.camera.focus, point-scene.camera.focus), 1.0, 5)
         if color.__class__.__name__ == "RayColor":
             pixels[x,y] = color.toRGB()
         elif type(color)==tuple:
@@ -171,8 +175,9 @@ if __name__=="__main__":
         print "min:" + str(reduce(lambda x,y: x if x < y else y, distances))
         distances.insert(0, 0.0)
         print "number of 0.0s:" + str(reduce(lambda x,y: x+1 if y == 0.0 else x, distances))
-    #im.save("/home/skyrunner/upload/imgs/test.png")
-    im.save("out/test.png")
+    im2 = im.resize((256,256), Image.ANTIALIAS)
+    im2.save("/home/skyrunner/upload/imgs/test.png")
+    #im.save("out/test.png")
     end = time()
     print "Took %.2f seconds." % (end - start)
-    im.show()
+    #im.show()
