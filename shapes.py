@@ -72,7 +72,7 @@ class RaycastingPlane(RaycastingObject):
         self.shape.n = axes[2]
         self.basicX = axes[0]
         self.basicY = axes[1]
-        self.squaresize = 25
+        self.squaresize = 0.5 
 
     def intersect(self, ray):
         return self.shape.intersect(ray)

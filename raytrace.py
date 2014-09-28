@@ -20,10 +20,10 @@ distances = []
 def reflect(point, obj, ray):
     if type(obj) == RaycastingSphere:
         n = (point - obj.c).normalized()
-        v = ray.v.normalized()
+        v = -ray.v.normalized()
     elif type(obj) == RaycastingPlane:
         n = obj.shape.n
-        v = ray.v.normalized()
+        v = -ray.v.normalized()
     else:
         raise TypeError("Unknown shape")
     return euclid.Ray3(point, 2 * n.dot(v) * n - v)
@@ -46,7 +46,7 @@ class Scene:
         self.objects = []
         self.camera = Camera(zoom=0.15, rotation=(0, 16, -4), width=cwidth, height=cheight)
         # light source is a single point for now
-        self.light = euclid.Point3(-80.0, 30.0, -20.0)
+        self.light = euclid.Point3(0.0, 0.0, 0.0)
 
 
     def getColor(self, intersect, obj, intensity):
@@ -61,15 +61,14 @@ class Scene:
                 if type(i) == euclid.Point3:
                     # often means intercept with self
                     continue
-                elif i == None:
+                elif not i: # is None
                     continue # no intercept
                 # otherwise find penetration
                 lenI = abs(i)
                 distances.append(lenI)
                 if lenI < 0.2:
                     continue
-            if i != None:
-                # is in shadow
+            if i: # intersect, so is in shadow                
                 return RayColor(intensity, (0,0,0))
         # otherwise not in shadow
         # find intensity depending on angle to light.
@@ -78,10 +77,10 @@ class Scene:
         elif type(obj) == RaycastingSphere:
             normal = (intersect - obj.shape.c).normalize()
         strength = abs(vectorToLight.normalized().dot(normal))
-        return RayColor(intensity*strength, obj.getColor(intersect))
+        return RayColor(intensity * strength, obj.getColor(intersect))
 
     def findIntersect(self, ray, previousObject = None):
-        maxD = 0
+        minD = float('inf')
         intersect = None
         obj = None
         for o in self.objects:
@@ -96,30 +95,29 @@ class Scene:
                 lenI = abs(inter)
                 if lenI < 0.2:
                     continue
-            if inter != None:
-                # intersects
+            if inter:  #intersects                
                 if type(inter) == euclid.LineSegment3:
                     d = abs(ray.p - o.c) - o.r
-                    if d > maxD:
-                        maxD = d
+                    if d < minD:
+                        minD = d
                         obj = o
                         # if inter is a line segment, we require the closer point.
                         L1 = abs(ray.p - inter.p1)
                         L2 = abs(ray.p - inter.p2)
                         if L1 > L2:
-                            intersect = inter.p1
-                        else:
                             intersect = inter.p2
+                        else:
+                            intersect = inter.p1
                 elif type(inter) == euclid.Point3:
                     d = abs(inter - ray.p)
-                    if d > maxD:
-                        maxD = d
+                    if d < minD:
+                        minD = d
                         obj = o
                         intersect = inter
                 else:
                     raise TypeError("Unknown type " + str(type(inter)))
                         
-        if obj == None:
+        if not obj:
             return None,None
         else:
             return intersect, obj
@@ -157,9 +155,9 @@ if __name__=="__main__":
     scene.objects[-1].reflectionIndex = 0.1
     scene.objects.append(RaycastingSphere(euclid.Point3(-55, 2, -5), 2.0))
     scene.objects[-1].color = (255,0,0)
-    scene.objects.append(RaycastingPlane((0,90,20), 
-        euclid.Point3(-50, 0, 0)))
-    scene.objects[-1].reflectionIndex = 0.2
+    """scene.objects.append(RaycastingPlane((0,0,0), 
+        euclid.Point3(0, 0, 5)))
+    scene.objects[-1].reflectionIndex = 0.2"""
     im = Image.new("RGB", (imgW, imgH), (0,0,255))
     pixels = im.load()
     for x, y, point in scene.camera.getPixelCoords(imgW, imgH):
@@ -175,9 +173,10 @@ if __name__=="__main__":
         print "min:" + str(reduce(lambda x,y: x if x < y else y, distances))
         distances.insert(0, 0.0)
         print "number of 0.0s:" + str(reduce(lambda x,y: x+1 if y == 0.0 else x, distances))
-    im2 = im.resize((256,256), Image.ANTIALIAS)
-    im2.save("/home/skyrunner/upload/imgs/test.png")
-    #im.save("out/test.png")
+    #im2 = im.resize((256,256), Image.ANTIALIAS)
+    #im.save("/home/skyrunner/upload/imgs/test.png")
+    im.save("out/test.png")
+    #im2.save("out/test.png")
     end = time()
     print "Took %.2f seconds." % (end - start)
-    #im.show()
+    im.show()
